@@ -34,10 +34,11 @@ function buildEvcCode(city, datetime) {
   return `My EVC code is FS2025 and I have submitted my feedback on (${datetime}) at ${city || "N/A"}`;
 }
 
-function buildHashtag(hobbies) {
+function buildHashtag(hobbies, extraHobby) {
   const first = (hobbies || "").trim().split(",")[0].trim();
-  if (!first) return "";
-  return `#${first.replace(/\s+/g, "").toLowerCase()}`;
+  const tag1 = first ? `#${first.replace(/\s+/g, "").toLowerCase()}` : "";
+  const tag2 = extraHobby ? `#${extraHobby.replace(/\s+/g, "").toLowerCase()}` : "";
+  return [tag1, tag2].filter(Boolean).join(" ");
 }
 
 function buildHobbies(dataHobby, extraHobby) {
@@ -61,7 +62,7 @@ const HOBBY_LIST = [
 
 function generateScript(data, email, evcCode, extraHobby) {
   const combinedHobbies = buildHobbies(data.hobbies, extraHobby);
-  const hashtag = buildHashtag(data.hobbies);
+  const hashtag = buildHashtag(data.hobbies, extraHobby);
   return `// ============================================================
 // E-INSTA FEEDBACK - AUTO FILL SCRIPT
 // ============================================================
@@ -468,7 +469,7 @@ export default function App() {
               {parsedData.hobbies && (
                 <div style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace" }}>
                   final: <span style={{ color: "#a5b4fc" }}>{buildHobbies(parsedData.hobbies, extraHobby) || "—"}</span>
-                  {"  "}hashtag: <span style={{ color: "#34d399" }}>{buildHashtag(parsedData.hobbies) || "—"}</span>
+                  {"  "}hashtag: <span style={{ color: "#34d399" }}>{buildHashtag(parsedData.hobbies, extraHobby) || "—"}</span>
                 </div>
               )}
             </div>
@@ -494,7 +495,7 @@ export default function App() {
               letterSpacing: "0.03em",
             }}
           >
-            ⚡ Generate Script
+           Generate Script
           </button>
 
           {script && (
@@ -516,7 +517,7 @@ export default function App() {
                 gap: "8px",
               }}
             >
-              <span>📋</span> View Generated Script
+              <span></span> View Generated Script
             </button>
           )}
         </div>
@@ -562,7 +563,7 @@ export default function App() {
                       if (f.key === "__email__") value = email;
                       else if (f.key === "__evc__") value = evc;
                       else if (f.key === "hobbies") value = buildHobbies(parsedData.hobbies, extraHobby);
-                      else if (f.key === "createHashtag") value = buildHashtag(parsedData.hobbies);
+                      else if (f.key === "createHashtag") value = buildHashtag(parsedData.hobbies, extraHobby);
                       else value = parsedData[f.key] || "";
 
                       const isAuto = f.key === "__email__" || f.key === "__evc__" || f.key === "createHashtag";
