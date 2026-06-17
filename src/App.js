@@ -319,10 +319,10 @@ export default function App() {
       }}>
         <div>
           <div style={{ fontSize: "10px", letterSpacing: "0.16em", color: "#6366f1", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px" }}>
-            Le Moot Diya Tere Forms Par
+            Whatever Whatever
           </div>
           <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#f1f5f9" }}>
-            E-Insta Script Generator
+            Idkidk Script Generator
           </h1>
         </div>
         <div style={{
