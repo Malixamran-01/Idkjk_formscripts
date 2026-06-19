@@ -36,23 +36,21 @@ function buildHobbies(dataHobby, extraHobby) {
   return dataHobby || extraHobby || "";
 }
 
-// Maps whatever marital status string comes from the form data into one of
-// the 4 options actually available in the target form's <select>.
 const MARITAL_STATUS_MAP = {
-  "unmarried": "Single",
-  "single": "Single",
-  "married": "Married",
-  "divorced": "Divorced",
-  "widowed": "Widowed",
-  "widow": "Widowed",
-  "widower": "Widowed",
-  "separated": "Divorced",
+  unmarried: "Single",
+  single: "Single",
+  married: "Married",
+  divorced: "Divorced",
+  widowed: "Widowed",
+  widow: "Widowed",
+  widower: "Widowed",
+  separated: "Divorced",
 };
 
 function mapMaritalStatus(raw) {
   if (!raw) return "";
   const key = raw.trim().toLowerCase();
-  return MARITAL_STATUS_MAP[key] || raw; // fallback to original text if no mapping found
+  return MARITAL_STATUS_MAP[key] || raw;
 }
 
 const HOBBY_LIST = [
@@ -77,37 +75,39 @@ function generateScript(data, email, evcCode, extraHobby) {
   const combinedHobbies = buildHobbies(data.hobbies, extraHobby);
   const hashtag = buildHashtag(data.hobbies, extraHobby);
   const maritalStatus = mapMaritalStatus(data.maritalStatus);
+  const esc = (v) => String(v ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
   return `// ============================================================
-// E-INSTA FEEDBACK - AUTO FILL SCRIPT (Form #${data.formNumber})
+// E-INSTA FEEDBACK - AUTO FILL SCRIPT (Form #${esc(data.formNumber)})
 // ============================================================
 
 const DATA = {
   // Step 1
-  name: '${data.name || ""}',
-  centerCode: '${data.centerCode || ""}',
-  gender: '${data.gender || ""}',
-  einstagramBenifits: '${(data.einstagramBenifits || "").replace(/'/g, "\\\\'")}',
-  feedbackId: '${data.feedbackId || ""}',
+  name: '${esc(data.name)}',
+  centerCode: '${esc(data.centerCode)}',
+  gender: '${esc(data.gender)}',
+  einstagramBenifits: '${esc(data.einstagramBenifits)}',
+  feedbackId: '${esc(data.feedbackId)}',
 
   // Step 2
-  howImportantInstagram: '${(data.howImportantInstagram || "").replace(/'/g, "\\\\'")}',
-  city: '${data.city || ""}',
-  age: '${data.age || ""}',
-  hobbies: '${combinedHobbies.replace(/'/g, "\\\\'")}',
-  primaryJob: '${(data.primaryJob || "").replace(/'/g, "\\\\'")}',
+  howImportantInstagram: '${esc(data.howImportantInstagram)}',
+  city: '${esc(data.city)}',
+  age: '${esc(data.age)}',
+  hobbies: '${esc(combinedHobbies)}',
+  primaryJob: '${esc(data.primaryJob)}',
 
   // Step 3
-  maritalStatus: '${maritalStatus}',
-  email: '${email}',
-  instagramMarketingTasks: '${(data.instagramMarketingTasks || "").replace(/'/g, "\\\\'")}',
-  education: '${data.education || ""}',
-  state: '${data.state || ""}',
+  maritalStatus: '${esc(maritalStatus)}',
+  email: '${esc(email)}',
+  instagramMarketingTasks: '${esc(data.instagramMarketingTasks)}',
+  education: '${esc(data.education)}',
+  state: '${esc(data.state)}',
 
   // Step 4
-  howOftenUseInstagram: '${(data.howOftenUseInstagram || "").replace(/'/g, "\\\\'")}',
-  createHashtag: '${hashtag.replace(/'/g, "\\\\'")}',
-  howDidYouHearAboutInstagram: '${data.howDidYouHearAboutInstagram || ""}',
-  evcCode: '${evcCode.replace(/'/g, "\\\\'")}',
+  howOftenUseInstagram: '${esc(data.howOftenUseInstagram)}',
+  createHashtag: '${esc(hashtag)}',
+  howDidYouHearAboutInstagram: '${esc(data.howDidYouHearAboutInstagram)}',
+  evcCode: '${esc(evcCode)}',
 };
 
 async function fillReactInput(selector, value, delay = 50) {
@@ -135,6 +135,19 @@ function fillReactSelect(selector, value) {
   nativeSetter.call(el, value);
   el.dispatchEvent(new Event('change', { bubbles: true }));
   console.log(\`✅ \${selector} →\`, value);
+}
+
+function getLiveNow() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = now.getFullYear();
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const hh = String(hours).padStart(2, '0');
+  return \`\${dd}-\${mm}-\${yyyy} \${hh}:\${minutes} \${ampm} IST\`;
 }
 
 function getStepHeading() {
@@ -194,7 +207,8 @@ async function fillStep4() {
   await fillReactInput('#howOftenUseInstagram', DATA.howOftenUseInstagram);
   await fillReactInput('#createHashtag', DATA.createHashtag);
   await fillReactInput('#howDidYouHearAboutInstagram', DATA.howDidYouHearAboutInstagram);
-  await fillReactInput('#evcCode', DATA.evcCode);
+  const liveEvcCode = \`My EVC code is FS2025 and I have submitted my feedback on (\${getLiveNow()}) at \${DATA.city || 'N/A'}\`;
+  await fillReactInput('#evcCode', liveEvcCode);
   const checkbox = document.querySelector('input[type="checkbox"]');
   if (checkbox && !checkbox.checked) {
     checkbox.click();
@@ -257,24 +271,33 @@ const STEP_COLORS = {
   4: { bg: "#1a1a2d", border: "#4c1d95", badge: "#8b5cf6", text: "Step 4" },
 };
 
+const labelStyle = {
+  display: "block",
+  fontSize: "11px",
+  color: "#94a3b8",
+  marginBottom: "8px",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+};
+
 export default function App() {
   const [formNumber, setFormNumber] = useState("");
   const [script, setScript] = useState("");
   const [copied, setCopied] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const [now, setNow] = useState(getNow());
   const [foundData, setFoundData] = useState(null);
   const [email, setEmail] = useState("");
   const [evc, setEvc] = useState("");
   const [error, setError] = useState("");
   const [extraHobby, setExtraHobby] = useState(randomHobby());
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(getNow()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Live lookup as user types form number
   useEffect(() => {
     const key = formNumber.trim();
     if (!key || !FORMS_DATA[key]) {
@@ -300,7 +323,7 @@ export default function App() {
     const generatedEvc = buildEvcCode(foundData.city, now);
     setScript(generateScript(foundData, generatedEmail, generatedEvc, extraHobby));
     setCopied(false);
-    setModalOpen(true);
+    setShowModal(true);
   }
 
   function handleCopy() {
@@ -310,8 +333,6 @@ export default function App() {
     });
   }
 
-  // Jump to next form number: clears current result, rolls a new random
-  // hobby, and bumps the form number field by 1 as a convenience.
   function handleNextForm() {
     const current = parseInt(formNumber.trim(), 10);
     const next = !isNaN(current) ? current + 1 : 1;
@@ -325,41 +346,37 @@ export default function App() {
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
       background: "#0f1117",
       fontFamily: "'Inter', 'Segoe UI', sans-serif",
       color: "#e2e8f0",
       overflow: "hidden",
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
     }}>
       {/* Header */}
       <div style={{
         background: "#141824",
         borderBottom: "1px solid #1e2535",
-        padding: "16px 28px",
+        padding: "14px 28px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexShrink: 0,
       }}>
         <div>
           <div style={{ fontSize: "10px", letterSpacing: "0.16em", color: "#6366f1", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px" }}>
             WHATEVER WHATEVER
           </div>
           <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#f1f5f9" }}>
-            idkidk Script Generator
+            Idkidk Script Generator
           </h1>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <button
-            onClick={handleNextForm}
-            style={{
-              background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
-              padding: "7px 16px", fontSize: "11px", fontWeight: 600,
-              color: "#a5b4fc", cursor: "pointer",
-            }}
-          >
+          <button onClick={handleNextForm} style={{
+            background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
+            padding: "7px 16px", fontSize: "11px", fontWeight: 600, color: "#a5b4fc", cursor: "pointer",
+          }}>
             ↻ Next Form
           </button>
           <div style={{
@@ -379,30 +396,27 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main layout */}
+      {/* Main layout — viewport-locked, two independently scrolling columns */}
       <div style={{
-        display: "flex",
-        gap: "0",
-        maxWidth: "1600px",
-        margin: "0 auto",
+        display: "grid",
+        gridTemplateColumns: foundData ? "1fr 1fr" : "1fr",
         flex: 1,
         overflow: "hidden",
+        maxWidth: "1400px",
         width: "100%",
+        margin: "0 auto",
       }}>
 
-        {/* LEFT — Input */}
+        {/* LEFT — independently scrollable */}
         <div style={{
-          padding: "28px 24px",
-          borderRight: foundData ? "1px solid #1e2535" : "none",
-          width: foundData ? "480px" : "100%",
-          minWidth: foundData ? "420px" : "auto",
-          flexShrink: 0,
           overflowY: "auto",
-          height: "100%",
-          boxSizing: "border-box",
+          padding: "24px",
+          borderRight: foundData ? "1px solid #1e2535" : "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
         }}>
-
-          <div style={{ marginBottom: "20px" }}>
+          <div>
             <label style={labelStyle}>Form Number</label>
             <input
               type="text"
@@ -428,31 +442,21 @@ export default function App() {
             </div>
           </div>
 
-          {/* Random second hobby */}
-          <div style={{ marginBottom: "20px" }}>
+          <div>
             <label style={labelStyle}>Auto-Picked Second Hobby</label>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <div style={{
-                background: "#141824",
-                border: "1px solid #2d3748",
-                borderRadius: "7px",
-                padding: "9px 14px",
-                color: "#a5b4fc",
-                fontSize: "13px",
-                fontFamily: "monospace",
-                flex: "1",
-                minWidth: "200px",
+                background: "#141824", border: "1px solid #2d3748", borderRadius: "7px",
+                padding: "9px 14px", color: "#a5b4fc", fontSize: "13px",
+                fontFamily: "monospace", flex: "1", minWidth: "200px",
               }}>
                 {extraHobby}
               </div>
-              <button
-                onClick={() => setExtraHobby(randomHobby())}
-                style={{
-                  background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "7px",
-                  padding: "9px 16px", fontSize: "12px", fontWeight: 600,
-                  color: "#a5b4fc", cursor: "pointer",
-                }}
-              >
+              <button onClick={() => setExtraHobby(randomHobby())} style={{
+                background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "7px",
+                padding: "9px 16px", fontSize: "12px", fontWeight: 600,
+                color: "#a5b4fc", cursor: "pointer",
+              }}>
                 🎲 Re-roll
               </button>
             </div>
@@ -463,7 +467,7 @@ export default function App() {
               </div>
             )}
             <div style={{ fontSize: "10px", color: "#374151", marginTop: "6px" }}>
-              Picked randomly from 60 hobbies. Re-rolls automatically when you click "↻ Next Form".
+              Picked randomly from 60 hobbies. Re-rolls automatically on "↻ Next Form".
             </div>
           </div>
 
@@ -471,7 +475,7 @@ export default function App() {
             <div style={{
               background: "#2d1515", border: "1px solid #7f1d1d",
               borderRadius: "8px", padding: "10px 16px",
-              marginBottom: "16px", fontSize: "13px", color: "#fca5a5",
+              fontSize: "13px", color: "#fca5a5",
             }}>
               ⚠️ {error}
             </div>
@@ -481,7 +485,7 @@ export default function App() {
             <div style={{
               background: "#0f1e16", border: "1px solid #166534",
               borderRadius: "8px", padding: "12px 16px",
-              marginBottom: "20px", fontSize: "13px", color: "#86efac",
+              fontSize: "13px", color: "#86efac",
             }}>
               ✓ Form #{formNumber} found — {foundData.name}, {foundData.city}
             </div>
@@ -495,26 +499,29 @@ export default function App() {
               color: foundData ? "#fff" : "#475569",
               border: "none", borderRadius: "8px",
               padding: "14px 36px", fontSize: "14px", fontWeight: 700,
-              cursor: foundData ? "pointer" : "not-allowed", width: "100%", marginBottom: "24px",
+              cursor: foundData ? "pointer" : "not-allowed", width: "100%",
               letterSpacing: "0.03em",
             }}
           >
-            Generate Script
+            ⚡ Generate Script
           </button>
 
+          {script && (
+            <button onClick={() => setShowModal(true)} style={{
+              background: "#1a1f2e", color: "#6366f1",
+              border: "1px solid #3730a3", borderRadius: "8px",
+              padding: "11px 20px", fontSize: "13px", fontWeight: 600,
+              cursor: "pointer", width: "100%",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}>
+              <span>📋</span> View Generated Script
+            </button>
+          )}
         </div>
 
-        {/* RIGHT — Live Preview */}
+        {/* RIGHT — independently scrollable */}
         {foundData && (
-          <div style={{
-            padding: "28px 24px",
-            background: "#0c0f18",
-            flex: 1,
-            overflowY: "auto",
-            height: "100%",
-            boxSizing: "border-box",
-            minWidth: 0,
-          }}>
+          <div style={{ overflowY: "auto", padding: "24px", background: "#0c0f18" }}>
             <div style={{ marginBottom: "20px" }}>
               <div style={{ fontSize: "11px", color: "#6366f1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "4px" }}>
                 Live Preview — Form #{formNumber}
@@ -527,23 +534,13 @@ export default function App() {
               const fields = PREVIEW_FIELDS.filter(f => f.step === step);
               return (
                 <div key={step} style={{
-                  background: sc.bg,
-                  border: `1px solid ${sc.border}`,
-                  borderRadius: "10px",
-                  padding: "16px",
-                  marginBottom: "14px",
+                  background: sc.bg, border: `1px solid ${sc.border}`,
+                  borderRadius: "10px", padding: "16px", marginBottom: "14px",
                 }}>
                   <div style={{
-                    display: "inline-block",
-                    background: sc.badge,
-                    color: "#fff",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                    padding: "3px 10px",
-                    borderRadius: "4px",
-                    marginBottom: "12px",
+                    display: "inline-block", background: sc.badge, color: "#fff",
+                    fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
+                    letterSpacing: "0.1em", padding: "3px 10px", borderRadius: "4px", marginBottom: "12px",
                   }}>
                     {sc.text}
                   </div>
@@ -557,31 +554,19 @@ export default function App() {
                       else if (f.key === "maritalStatus") value = mapMaritalStatus(foundData.maritalStatus);
                       else value = foundData[f.key] || "";
 
-                      const isAuto = f.key === "__email__" || f.key === "__evc__" || f.key === "state" || f.key === "hobbies" || f.key === "createHashtag" || f.key === "maritalStatus";
+                      const isAuto = ["__email__", "__evc__", "state", "hobbies", "createHashtag", "maritalStatus"].includes(f.key);
                       const isEmpty = !value;
 
                       return (
-                        <div key={f.key} style={{
-                          display: "grid",
-                          gridTemplateColumns: "140px 1fr",
-                          gap: "8px",
-                          alignItems: "start",
-                        }}>
-                          <div style={{
-                            fontSize: "11px",
-                            color: "#64748b",
-                            fontWeight: 500,
-                            paddingTop: "1px",
-                          }}>
+                        <div key={f.key} style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "8px", alignItems: "start" }}>
+                          <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 500, paddingTop: "1px" }}>
                             {f.label}
                             {isAuto && <span style={{ color: sc.badge, marginLeft: "4px" }}>✦</span>}
                           </div>
                           <div style={{
-                            fontSize: "12px",
-                            fontFamily: "monospace",
+                            fontSize: "12px", fontFamily: "monospace",
                             color: isEmpty ? "#374151" : isAuto ? "#34d399" : "#e2e8f0",
-                            wordBreak: "break-word",
-                            lineHeight: "1.5",
+                            wordBreak: "break-word", lineHeight: "1.5",
                           }}>
                             {isEmpty ? "—" : value}
                           </div>
@@ -594,13 +579,9 @@ export default function App() {
             })}
 
             <div style={{
-              background: "#141824",
-              border: "1px solid #1e2535",
-              borderRadius: "8px",
-              padding: "12px 16px",
-              fontSize: "11px",
-              color: "#475569",
-              marginTop: "4px",
+              background: "#141824", border: "1px solid #1e2535",
+              borderRadius: "8px", padding: "12px 16px",
+              fontSize: "11px", color: "#475569", marginTop: "4px",
             }}>
               <span style={{ color: "#6366f1" }}>✦</span> Auto-generated from form data + live clock
             </div>
@@ -609,9 +590,9 @@ export default function App() {
       </div>
 
       {/* Script Modal */}
-      {modalOpen && script && (
+      {showModal && (
         <div
-          onClick={() => setModalOpen(false)}
+          onClick={() => setShowModal(false)}
           style={{
             position: "fixed", inset: 0,
             background: "rgba(0,0,0,0.75)",
@@ -623,32 +604,24 @@ export default function App() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: "#141824",
-              border: "1px solid #2d3748",
-              borderRadius: "14px",
-              width: "100%",
-              maxWidth: "860px",
-              maxHeight: "85vh",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+              background: "#141824", border: "1px solid #2d3748",
+              borderRadius: "16px", width: "100%", maxWidth: "860px",
+              maxHeight: "85vh", display: "flex", flexDirection: "column",
+              overflow: "hidden", boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
             }}
           >
-            {/* Modal header */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "16px 20px",
-              borderBottom: "1px solid #1e2535",
-              background: "#1a1f2e",
-              flexShrink: 0,
+              padding: "16px 24px", borderBottom: "1px solid #1e2535",
+              background: "#1a1f2e", flexShrink: 0,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
-                <span style={{ fontSize: "14px", fontWeight: 700, color: "#f1f5f9" }}>Generated Script</span>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e" }} />
+                <span style={{ fontSize: "13px", color: "#f1f5f9", fontWeight: 700 }}>Generated Script</span>
                 <span style={{
-                  fontSize: "10px", fontWeight: 700, color: "#6366f1",
-                  textTransform: "uppercase", letterSpacing: "0.12em",
+                  fontSize: "10px", color: "#6366f1", fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.1em",
+                  background: "#1e1b4b", padding: "2px 8px", borderRadius: "4px",
                 }}>
                   Ready to paste in console
                 </span>
@@ -657,51 +630,46 @@ export default function App() {
                 <button
                   onClick={handleCopy}
                   style={{
-                    background: copied ? "#22c55e" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                    color: "#fff", border: "none", borderRadius: "8px",
-                    padding: "9px 22px", fontSize: "13px", fontWeight: 600,
+                    background: copied ? "#16a34a" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    color: "#fff", border: "none", borderRadius: "7px",
+                    padding: "8px 22px", fontSize: "13px", fontWeight: 600,
                     cursor: "pointer", transition: "background 0.2s",
-                    display: "flex", alignItems: "center", gap: "7px",
+                    display: "flex", alignItems: "center", gap: "6px",
                   }}
                 >
                   {copied ? "✓ Copied!" : "⎘ Copy Script"}
                 </button>
                 <button
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => setShowModal(false)}
                   style={{
-                    background: "#0f1117", border: "1px solid #2d3748", borderRadius: "8px",
-                    width: "36px", height: "36px", display: "flex", alignItems: "center",
-                    justifyContent: "center", cursor: "pointer", color: "#94a3b8",
-                    fontSize: "16px", flexShrink: 0,
+                    background: "transparent", color: "#64748b",
+                    border: "1px solid #2d3748", borderRadius: "7px",
+                    width: "34px", height: "34px", fontSize: "16px",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
+                  aria-label="Close modal"
                 >
-                  ×
+                  ✕
                 </button>
               </div>
             </div>
 
-            {/* Script content */}
             <pre style={{
-              margin: 0, padding: "24px", fontSize: "12px", lineHeight: "1.8",
+              margin: 0, padding: "24px", fontSize: "12px", lineHeight: "1.75",
               color: "#94a3b8", overflowY: "auto", overflowX: "auto",
-              fontFamily: "'Fira Code', 'Consolas', monospace",
-              whiteSpace: "pre", flex: 1,
+              fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+              flex: 1, minHeight: 0,
             }}>
               {script}
             </pre>
 
-            {/* Modal footer */}
             <div style={{
-              padding: "10px 20px",
-              borderTop: "1px solid #1e2535",
-              background: "#1a1f2e",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              flexShrink: 0,
+              padding: "12px 24px", borderTop: "1px solid #1e2535",
+              background: "#0f1117", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
-              <span style={{ fontSize: "11px", color: "#475569" }}>Click outside or × to close</span>
-              <span style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace" }}>
-                {script.split("\n").length} lines
-              </span>
+              <span style={{ fontSize: "11px", color: "#374151" }}>Click outside or ✕ to close</span>
+              <span style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace" }}>{script.split("\n").length} lines</span>
             </div>
           </div>
         </div>
@@ -711,18 +679,8 @@ export default function App() {
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #141824; }
         ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
-        textarea:focus, input:focus { border-color: #6366f1 !important; }
+        input:focus { border-color: #6366f1 !important; }
       `}</style>
     </div>
   );
 }
-
-const labelStyle = {
-  display: "block",
-  fontSize: "11px",
-  color: "#94a3b8",
-  marginBottom: "8px",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-};
