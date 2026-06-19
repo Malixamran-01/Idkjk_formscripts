@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import FORMS_DATA from "./formsData";
 
 function getNow() {
   const now = new Date();
@@ -11,17 +12,6 @@ function getNow() {
   hours = hours % 12 || 12;
   const hh = String(hours).padStart(2, "0");
   return `${dd}-${mm}-${yyyy} ${hh}:${minutes} ${ampm} IST`;
-}
-
-function parseDataObject(raw) {
-  const cleaned = raw.replace(/\/\/.*$/gm, "");
-  const result = {};
-  const regex = /(\w+)\s*:\s*'([^']*)'/g;
-  let match;
-  while ((match = regex.exec(cleaned)) !== null) {
-    result[match[1]] = match[2];
-  }
-  return result;
 }
 
 function buildEmail(formNumber, name) {
@@ -46,6 +36,25 @@ function buildHobbies(dataHobby, extraHobby) {
   return dataHobby || extraHobby || "";
 }
 
+// Maps whatever marital status string comes from the form data into one of
+// the 4 options actually available in the target form's <select>.
+const MARITAL_STATUS_MAP = {
+  "unmarried": "Single",
+  "single": "Single",
+  "married": "Married",
+  "divorced": "Divorced",
+  "widowed": "Widowed",
+  "widow": "Widowed",
+  "widower": "Widowed",
+  "separated": "Divorced",
+};
+
+function mapMaritalStatus(raw) {
+  if (!raw) return "";
+  const key = raw.trim().toLowerCase();
+  return MARITAL_STATUS_MAP[key] || raw; // fallback to original text if no mapping found
+}
+
 const HOBBY_LIST = [
   "Photography", "Painting", "Drawing", "Sketching", "Cooking", "Baking",
   "Gardening", "Reading", "Writing", "Blogging", "Travelling", "Hiking",
@@ -60,11 +69,16 @@ const HOBBY_LIST = [
   "Collecting Stamps", "Archery", "Horse Riding", "Surfing", "Diving",
 ];
 
+function randomHobby() {
+  return HOBBY_LIST[Math.floor(Math.random() * HOBBY_LIST.length)];
+}
+
 function generateScript(data, email, evcCode, extraHobby) {
   const combinedHobbies = buildHobbies(data.hobbies, extraHobby);
   const hashtag = buildHashtag(data.hobbies, extraHobby);
+  const maritalStatus = mapMaritalStatus(data.maritalStatus);
   return `// ============================================================
-// E-INSTA FEEDBACK - AUTO FILL SCRIPT
+// E-INSTA FEEDBACK - AUTO FILL SCRIPT (Form #${data.formNumber})
 // ============================================================
 
 const DATA = {
@@ -72,28 +86,28 @@ const DATA = {
   name: '${data.name || ""}',
   centerCode: '${data.centerCode || ""}',
   gender: '${data.gender || ""}',
-  einstagramBenifits: '${data.einstagramBenifits || ""}',
+  einstagramBenifits: '${(data.einstagramBenifits || "").replace(/'/g, "\\\\'")}',
   feedbackId: '${data.feedbackId || ""}',
 
   // Step 2
-  howImportantInstagram: '${data.howImportantInstagram || ""}',
+  howImportantInstagram: '${(data.howImportantInstagram || "").replace(/'/g, "\\\\'")}',
   city: '${data.city || ""}',
   age: '${data.age || ""}',
-  hobbies: '${combinedHobbies}',
-  primaryJob: '${data.primaryJob || ""}',
+  hobbies: '${combinedHobbies.replace(/'/g, "\\\\'")}',
+  primaryJob: '${(data.primaryJob || "").replace(/'/g, "\\\\'")}',
 
   // Step 3
-  maritalStatus: '${data.maritalStatus || ""}',
+  maritalStatus: '${maritalStatus}',
   email: '${email}',
-  instagramMarketingTasks: '${data.instagramMarketingTasks || ""}',
+  instagramMarketingTasks: '${(data.instagramMarketingTasks || "").replace(/'/g, "\\\\'")}',
   education: '${data.education || ""}',
   state: '${data.state || ""}',
 
   // Step 4
-  howOftenUseInstagram: '${data.howOftenUseInstagram || ""}',
-  createHashtag: '${hashtag}',
+  howOftenUseInstagram: '${(data.howOftenUseInstagram || "").replace(/'/g, "\\\\'")}',
+  createHashtag: '${hashtag.replace(/'/g, "\\\\'")}',
   howDidYouHearAboutInstagram: '${data.howDidYouHearAboutInstagram || ""}',
-  evcCode: '${evcCode}',
+  evcCode: '${evcCode.replace(/'/g, "\\\\'")}',
 };
 
 async function fillReactInput(selector, value, delay = 50) {
@@ -223,13 +237,13 @@ const PREVIEW_FIELDS = [
   { key: "howImportantInstagram", label: "How Important is E-Instagram", step: 2 },
   { key: "city", label: "City", step: 2 },
   { key: "age", label: "Age", step: 2 },
-  { key: "hobbies", label: "Hobbies", step: 2 },
+  { key: "hobbies", label: "Hobbies (auto + random)", step: 2 },
   { key: "primaryJob", label: "Primary Job", step: 2 },
-  { key: "maritalStatus", label: "Marital Status", step: 3 },
+  { key: "maritalStatus", label: "Marital Status (mapped)", step: 3 },
   { key: "__email__", label: "Email (auto)", step: 3 },
   { key: "instagramMarketingTasks", label: "Marketing Tasks", step: 3 },
   { key: "education", label: "Education", step: 3 },
-  { key: "state", label: "State", step: 3 },
+  { key: "state", label: "State (auto)", step: 3 },
   { key: "howOftenUseInstagram", label: "How Often Use Instagram", step: 4 },
   { key: "createHashtag", label: "Create Hashtag (auto)", step: 4 },
   { key: "howDidYouHearAboutInstagram", label: "How Did You Hear", step: 4 },
@@ -244,49 +258,49 @@ const STEP_COLORS = {
 };
 
 export default function App() {
-  const [raw, setRaw] = useState("");
   const [formNumber, setFormNumber] = useState("");
   const [script, setScript] = useState("");
   const [copied, setCopied] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [now, setNow] = useState(getNow());
-  const [parsedData, setParsedData] = useState({});
+  const [foundData, setFoundData] = useState(null);
   const [email, setEmail] = useState("");
   const [evc, setEvc] = useState("");
   const [error, setError] = useState("");
-  const [extraHobby, setExtraHobby] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [extraHobby, setExtraHobby] = useState(randomHobby());
 
   useEffect(() => {
     const timer = setInterval(() => setNow(getNow()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Live parse as user types
+  // Live lookup as user types form number
   useEffect(() => {
-    try {
-      if (!raw.trim()) { setParsedData({}); setEmail(""); setEvc(""); return; }
-      const data = parseDataObject(raw);
-      setParsedData(data);
-      setEmail(formNumber && data.name ? buildEmail(formNumber, data.name) : "");
-      setEvc(data.city ? buildEvcCode(data.city, now) : "");
-    } catch (_) {}
-  }, [raw, formNumber, now]);
+    const key = formNumber.trim();
+    if (!key || !FORMS_DATA[key]) {
+      setFoundData(null);
+      setEmail("");
+      setEvc("");
+      setError(key && !FORMS_DATA[key] ? `Form #${key} not found in dataset.` : "");
+      return;
+    }
+    const data = FORMS_DATA[key];
+    setFoundData(data);
+    setEmail(buildEmail(key, data.name));
+    setEvc(buildEvcCode(data.city, now));
+    setError("");
+  }, [formNumber, now]);
 
   function handleGenerate() {
-    setError("");
-    if (!raw.trim()) { setError("Paste your data object first."); return; }
-    if (!formNumber.trim()) { setError("Enter a Form Number."); return; }
-    try {
-      const data = parseDataObject(raw);
-      if (!data.name) { setError("Could not parse 'name'. Check your format."); return; }
-      const generatedEmail = buildEmail(formNumber, data.name);
-      const generatedEvc = buildEvcCode(data.city, now);
-      setScript(generateScript(data, generatedEmail, generatedEvc, extraHobby));
-      setCopied(false);
-      setShowModal(true);
-    } catch (e) {
-      setError("Failed to parse data object. Check the format.");
+    if (!foundData) {
+      setError(formNumber.trim() ? `Form #${formNumber} not found.` : "Enter a Form Number first.");
+      return;
     }
+    const generatedEmail = buildEmail(formNumber.trim(), foundData.name);
+    const generatedEvc = buildEvcCode(foundData.city, now);
+    setScript(generateScript(foundData, generatedEmail, generatedEvc, extraHobby));
+    setCopied(false);
+    setModalOpen(true);
   }
 
   function handleCopy() {
@@ -296,182 +310,160 @@ export default function App() {
     });
   }
 
-  const hasPreview = Object.keys(parsedData).length > 0;
+  // Jump to next form number: clears current result, rolls a new random
+  // hobby, and bumps the form number field by 1 as a convenience.
+  function handleNextForm() {
+    const current = parseInt(formNumber.trim(), 10);
+    const next = !isNaN(current) ? current + 1 : 1;
+    setFormNumber(String(next));
+    setScript("");
+    setCopied(false);
+    setExtraHobby(randomHobby());
+  }
+
+  const totalForms = Object.keys(FORMS_DATA).length;
 
   return (
     <div style={{
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
+      minHeight: "100vh",
       background: "#0f1117",
       fontFamily: "'Inter', 'Segoe UI', sans-serif",
       color: "#e2e8f0",
       overflow: "hidden",
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
     }}>
       {/* Header */}
       <div style={{
         background: "#141824",
         borderBottom: "1px solid #1e2535",
-        padding: "14px 28px",
+        padding: "16px 28px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        flexShrink: 0,
       }}>
         <div>
           <div style={{ fontSize: "10px", letterSpacing: "0.16em", color: "#6366f1", fontWeight: 700, textTransform: "uppercase", marginBottom: "3px" }}>
-            Whatever Whatever
+            WHATEVER WHATEVER
           </div>
           <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#f1f5f9" }}>
-            Idkidk Script Generator
+            idkidk Script Generator
           </h1>
         </div>
-        <div style={{
-          background: "#1a1f2e",
-          border: "1px solid #2d3748",
-          borderRadius: "8px",
-          padding: "7px 14px",
-          fontSize: "11px",
-          fontFamily: "monospace",
-          color: "#64748b",
-          display: "flex",
-          alignItems: "center",
-          gap: "7px",
-        }}>
-          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-          {now}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={handleNextForm}
+            style={{
+              background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
+              padding: "7px 16px", fontSize: "11px", fontWeight: 600,
+              color: "#a5b4fc", cursor: "pointer",
+            }}
+          >
+            ↻ Next Form
+          </button>
+          <div style={{
+            background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
+            padding: "7px 14px", fontSize: "11px", color: "#6366f1", fontWeight: 700,
+          }}>
+            {totalForms} forms loaded
+          </div>
+          <div style={{
+            background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
+            padding: "7px 14px", fontSize: "11px", fontFamily: "monospace", color: "#64748b",
+            display: "flex", alignItems: "center", gap: "7px",
+          }}>
+            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+            {now}
+          </div>
         </div>
       </div>
 
-      {/* Main layout — fills remaining viewport height */}
+      {/* Main layout */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: hasPreview ? "1fr 1fr" : "1fr",
+        display: "flex",
+        gap: "0",
+        maxWidth: "1600px",
+        margin: "0 auto",
         flex: 1,
         overflow: "hidden",
-        maxWidth: "1400px",
         width: "100%",
-        margin: "0 auto",
       }}>
 
-        {/* LEFT — Input, independently scrollable */}
+        {/* LEFT — Input */}
         <div style={{
+          padding: "28px 24px",
+          borderRight: foundData ? "1px solid #1e2535" : "none",
+          width: foundData ? "480px" : "100%",
+          minWidth: foundData ? "420px" : "auto",
+          flexShrink: 0,
           overflowY: "auto",
-          padding: "24px",
-          borderRight: hasPreview ? "1px solid #1e2535" : "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
+          height: "100%",
+          boxSizing: "border-box",
         }}>
 
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "16px" }}>
-            <div>
-              <label style={labelStyle}>Form Number</label>
-              <input
-                type="text"
-                value={formNumber}
-                onChange={e => setFormNumber(e.target.value)}
-                placeholder="e.g. 1042"
-                style={{
-                  background: "#141824",
-                  border: "1px solid #2d3748",
-                  borderRadius: "7px",
-                  padding: "9px 14px",
-                  color: "#e2e8f0",
-                  fontSize: "13px",
-                  outline: "none",
-                  width: "160px",
-                }}
-              />
-            </div>
-            <div style={{ fontSize: "11px", color: "#475569", paddingBottom: "10px" }}>
-              → email will be <span style={{ color: "#6366f1", fontFamily: "monospace" }}>
-                {formNumber && parsedData.name ? buildEmail(formNumber, parsedData.name) : `${formNumber || "N"}_Name_123@rediffmail.com`}
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Paste Your Data Object</label>
-            <textarea
-              value={raw}
-              onChange={e => setRaw(e.target.value)}
-              placeholder={`{
-  // Step 1
-  name: 'John Doe',
-  centerCode: 'CENTER123',
-  gender: 'Male',
-  einstagramBenifits: 'Increases brand visibility',
-  feedbackId: 'FB-2024-001',
-
-  // Step 2
-  howImportantInstagram: 'Very important',
-  city: 'Mumbai',
-  age: '25',
-  hobbies: 'Reading, Photography',
-  primaryJob: 'Digital Marketing Manager',
-
-  // Step 3
-  maritalStatus: 'Single',
-  instagramMarketingTasks: 'Content creation',
-  education: 'BBA',
-  state: 'Maharashtra',
-
-  // Step 4
-  howOftenUseInstagram: 'Daily',
-  createHashtag: '#BrandGrowth',
-  howDidYouHearAboutInstagram: 'Colleague',
-  evcCode: 'placeholder',
-}`}
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Form Number</label>
+            <input
+              type="text"
+              value={formNumber}
+              onChange={e => setFormNumber(e.target.value)}
+              placeholder="e.g. 1, 10, 247, 3000..."
+              autoFocus
               style={{
-                width: "100%",
-                height: "280px",
                 background: "#141824",
-                border: "1px solid #2d3748",
-                borderRadius: "10px",
-                padding: "16px",
-                color: "#a5b4fc",
-                fontSize: "13px",
-                fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-                lineHeight: "1.75",
+                border: foundData ? "1px solid #22c55e" : "1px solid #2d3748",
+                borderRadius: "8px",
+                padding: "14px 16px",
+                color: "#e2e8f0",
+                fontSize: "18px",
+                fontWeight: 700,
                 outline: "none",
-                resize: "none",
+                width: "100%",
                 boxSizing: "border-box",
               }}
             />
+            <div style={{ fontSize: "11px", color: "#475569", marginTop: "8px" }}>
+              Type a form number (1–{totalForms}) — data fetches automatically
+            </div>
           </div>
 
-          {/* Extra Hobby */}
-          <div>
-            <label style={labelStyle}>Add Extra Hobby</label>
+          {/* Random second hobby */}
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Auto-Picked Second Hobby</label>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <select
-                value={extraHobby}
-                onChange={e => setExtraHobby(e.target.value)}
+              <div style={{
+                background: "#141824",
+                border: "1px solid #2d3748",
+                borderRadius: "7px",
+                padding: "9px 14px",
+                color: "#a5b4fc",
+                fontSize: "13px",
+                fontFamily: "monospace",
+                flex: "1",
+                minWidth: "200px",
+              }}>
+                {extraHobby}
+              </div>
+              <button
+                onClick={() => setExtraHobby(randomHobby())}
                 style={{
-                  background: "#141824",
-                  border: "1px solid #2d3748",
-                  borderRadius: "7px",
-                  padding: "9px 14px",
-                  color: extraHobby ? "#e2e8f0" : "#475569",
-                  fontSize: "13px",
-                  outline: "none",
-                  flex: "1",
-                  minWidth: "200px",
-                  cursor: "pointer",
+                  background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "7px",
+                  padding: "9px 16px", fontSize: "12px", fontWeight: 600,
+                  color: "#a5b4fc", cursor: "pointer",
                 }}
               >
-                <option value="">— Select a hobby (optional) —</option>
-                {HOBBY_LIST.map(h => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-              {parsedData.hobbies && (
-                <div style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace" }}>
-                  final: <span style={{ color: "#a5b4fc" }}>{buildHobbies(parsedData.hobbies, extraHobby) || "—"}</span>
-                  {"  "}hashtag: <span style={{ color: "#34d399" }}>{buildHashtag(parsedData.hobbies, extraHobby) || "—"}</span>
-                </div>
-              )}
+                🎲 Re-roll
+              </button>
+            </div>
+            {foundData?.hobbies && (
+              <div style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace", marginTop: "8px" }}>
+                final: <span style={{ color: "#a5b4fc" }}>{buildHobbies(foundData.hobbies, extraHobby) || "—"}</span>
+                {"  "}hashtag: <span style={{ color: "#34d399" }}>{buildHashtag(foundData.hobbies, extraHobby) || "—"}</span>
+              </div>
+            )}
+            <div style={{ fontSize: "10px", color: "#374151", marginTop: "6px" }}>
+              Picked randomly from 60 hobbies. Re-rolls automatically when you click "↻ Next Form".
             </div>
           </div>
 
@@ -479,55 +471,53 @@ export default function App() {
             <div style={{
               background: "#2d1515", border: "1px solid #7f1d1d",
               borderRadius: "8px", padding: "10px 16px",
-              fontSize: "13px", color: "#fca5a5",
+              marginBottom: "16px", fontSize: "13px", color: "#fca5a5",
             }}>
               ⚠️ {error}
             </div>
           )}
 
+          {foundData && (
+            <div style={{
+              background: "#0f1e16", border: "1px solid #166534",
+              borderRadius: "8px", padding: "12px 16px",
+              marginBottom: "20px", fontSize: "13px", color: "#86efac",
+            }}>
+              ✓ Form #{formNumber} found — {foundData.name}, {foundData.city}
+            </div>
+          )}
+
           <button
             onClick={handleGenerate}
+            disabled={!foundData}
             style={{
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              color: "#fff", border: "none", borderRadius: "8px",
-              padding: "13px 36px", fontSize: "14px", fontWeight: 700,
-              cursor: "pointer", width: "100%",
+              background: foundData ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#1e2433",
+              color: foundData ? "#fff" : "#475569",
+              border: "none", borderRadius: "8px",
+              padding: "14px 36px", fontSize: "14px", fontWeight: 700,
+              cursor: foundData ? "pointer" : "not-allowed", width: "100%", marginBottom: "24px",
               letterSpacing: "0.03em",
             }}
           >
-           Generate Script
+            Generate Script
           </button>
 
-          {script && (
-            <button
-              onClick={() => setShowModal(true)}
-              style={{
-                background: "#1a1f2e",
-                color: "#6366f1",
-                border: "1px solid #3730a3",
-                borderRadius: "8px",
-                padding: "11px 20px",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: "pointer",
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
-            >
-              <span></span> View Generated Script
-            </button>
-          )}
         </div>
 
-        {/* RIGHT — Live Preview, independently scrollable */}
-        {hasPreview && (
-          <div style={{ overflowY: "auto", padding: "24px", background: "#0c0f18" }}>
+        {/* RIGHT — Live Preview */}
+        {foundData && (
+          <div style={{
+            padding: "28px 24px",
+            background: "#0c0f18",
+            flex: 1,
+            overflowY: "auto",
+            height: "100%",
+            boxSizing: "border-box",
+            minWidth: 0,
+          }}>
             <div style={{ marginBottom: "20px" }}>
               <div style={{ fontSize: "11px", color: "#6366f1", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "4px" }}>
-                Live Preview
+                Live Preview — Form #{formNumber}
               </div>
               <div style={{ fontSize: "12px", color: "#475569" }}>Confirm all values before generating</div>
             </div>
@@ -562,11 +552,12 @@ export default function App() {
                       let value = "";
                       if (f.key === "__email__") value = email;
                       else if (f.key === "__evc__") value = evc;
-                      else if (f.key === "hobbies") value = buildHobbies(parsedData.hobbies, extraHobby);
-                      else if (f.key === "createHashtag") value = buildHashtag(parsedData.hobbies, extraHobby);
-                      else value = parsedData[f.key] || "";
+                      else if (f.key === "hobbies") value = buildHobbies(foundData.hobbies, extraHobby);
+                      else if (f.key === "createHashtag") value = buildHashtag(foundData.hobbies, extraHobby);
+                      else if (f.key === "maritalStatus") value = mapMaritalStatus(foundData.maritalStatus);
+                      else value = foundData[f.key] || "";
 
-                      const isAuto = f.key === "__email__" || f.key === "__evc__" || f.key === "createHashtag";
+                      const isAuto = f.key === "__email__" || f.key === "__evc__" || f.key === "state" || f.key === "hobbies" || f.key === "createHashtag" || f.key === "maritalStatus";
                       const isEmpty = !value;
 
                       return (
@@ -576,7 +567,12 @@ export default function App() {
                           gap: "8px",
                           alignItems: "start",
                         }}>
-                          <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 500, paddingTop: "1px" }}>
+                          <div style={{
+                            fontSize: "11px",
+                            color: "#64748b",
+                            fontWeight: 500,
+                            paddingTop: "1px",
+                          }}>
                             {f.label}
                             {isAuto && <span style={{ color: sc.badge, marginLeft: "4px" }}>✦</span>}
                           </div>
@@ -584,7 +580,7 @@ export default function App() {
                             fontSize: "12px",
                             fontFamily: "monospace",
                             color: isEmpty ? "#374151" : isAuto ? "#34d399" : "#e2e8f0",
-                            wordBreak: "break-all",
+                            wordBreak: "break-word",
                             lineHeight: "1.5",
                           }}>
                             {isEmpty ? "—" : value}
@@ -598,20 +594,24 @@ export default function App() {
             })}
 
             <div style={{
-              background: "#141824", border: "1px solid #1e2535",
-              borderRadius: "8px", padding: "12px 16px",
-              fontSize: "11px", color: "#475569", marginTop: "4px",
+              background: "#141824",
+              border: "1px solid #1e2535",
+              borderRadius: "8px",
+              padding: "12px 16px",
+              fontSize: "11px",
+              color: "#475569",
+              marginTop: "4px",
             }}>
-              <span style={{ color: "#6366f1" }}>✦</span> Auto-generated from your input + live clock
+              <span style={{ color: "#6366f1" }}>✦</span> Auto-generated from form data + live clock
             </div>
           </div>
         )}
       </div>
 
       {/* Script Modal */}
-      {showModal && (
+      {modalOpen && script && (
         <div
-          onClick={() => setShowModal(false)}
+          onClick={() => setModalOpen(false)}
           style={{
             position: "fixed", inset: 0,
             background: "rgba(0,0,0,0.75)",
@@ -625,7 +625,7 @@ export default function App() {
             style={{
               background: "#141824",
               border: "1px solid #2d3748",
-              borderRadius: "16px",
+              borderRadius: "14px",
               width: "100%",
               maxWidth: "860px",
               maxHeight: "85vh",
@@ -638,21 +638,17 @@ export default function App() {
             {/* Modal header */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "16px 24px", borderBottom: "1px solid #1e2535",
-              background: "#1a1f2e", flexShrink: 0,
+              padding: "16px 20px",
+              borderBottom: "1px solid #1e2535",
+              background: "#1a1f2e",
+              flexShrink: 0,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{
-                  width: "8px", height: "8px", borderRadius: "50%",
-                  background: "#22c55e", boxShadow: "0 0 8px #22c55e",
-                }} />
-                <span style={{ fontSize: "13px", color: "#f1f5f9", fontWeight: 700 }}>
-                  Generated Script
-                </span>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} />
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#f1f5f9" }}>Generated Script</span>
                 <span style={{
-                  fontSize: "10px", color: "#6366f1", fontWeight: 700,
-                  textTransform: "uppercase", letterSpacing: "0.1em",
-                  background: "#1e1b4b", padding: "2px 8px", borderRadius: "4px",
+                  fontSize: "10px", fontWeight: 700, color: "#6366f1",
+                  textTransform: "uppercase", letterSpacing: "0.12em",
                 }}>
                   Ready to paste in console
                 </span>
@@ -661,56 +657,48 @@ export default function App() {
                 <button
                   onClick={handleCopy}
                   style={{
-                    background: copied ? "#16a34a" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                    color: "#fff", border: "none", borderRadius: "7px",
-                    padding: "8px 22px", fontSize: "13px", fontWeight: 600,
+                    background: copied ? "#22c55e" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    color: "#fff", border: "none", borderRadius: "8px",
+                    padding: "9px 22px", fontSize: "13px", fontWeight: 600,
                     cursor: "pointer", transition: "background 0.2s",
-                    display: "flex", alignItems: "center", gap: "6px",
+                    display: "flex", alignItems: "center", gap: "7px",
                   }}
                 >
                   {copied ? "✓ Copied!" : "⎘ Copy Script"}
                 </button>
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={() => setModalOpen(false)}
                   style={{
-                    background: "transparent", color: "#64748b",
-                    border: "1px solid #2d3748", borderRadius: "7px",
-                    width: "34px", height: "34px", fontSize: "16px",
-                    cursor: "pointer", display: "flex", alignItems: "center",
-                    justifyContent: "center", lineHeight: 1,
+                    background: "#0f1117", border: "1px solid #2d3748", borderRadius: "8px",
+                    width: "36px", height: "36px", display: "flex", alignItems: "center",
+                    justifyContent: "center", cursor: "pointer", color: "#94a3b8",
+                    fontSize: "16px", flexShrink: 0,
                   }}
-                  aria-label="Close modal"
                 >
-                  ✕
+                  ×
                 </button>
               </div>
             </div>
 
-            {/* Script body */}
+            {/* Script content */}
             <pre style={{
-              margin: 0,
-              padding: "24px",
-              fontSize: "12px",
-              lineHeight: "1.75",
-              color: "#94a3b8",
-              overflowY: "auto",
-              overflowX: "auto",
-              fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-              flex: 1,
-              minHeight: 0,
+              margin: 0, padding: "24px", fontSize: "12px", lineHeight: "1.8",
+              color: "#94a3b8", overflowY: "auto", overflowX: "auto",
+              fontFamily: "'Fira Code', 'Consolas', monospace",
+              whiteSpace: "pre", flex: 1,
             }}>
               {script}
             </pre>
 
             {/* Modal footer */}
             <div style={{
-              padding: "12px 24px", borderTop: "1px solid #1e2535",
-              background: "#0f1117", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 20px",
+              borderTop: "1px solid #1e2535",
+              background: "#1a1f2e",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              flexShrink: 0,
             }}>
-              <span style={{ fontSize: "11px", color: "#374151" }}>
-                Click outside or ✕ to close
-              </span>
+              <span style={{ fontSize: "11px", color: "#475569" }}>Click outside or × to close</span>
               <span style={{ fontSize: "11px", color: "#475569", fontFamily: "monospace" }}>
                 {script.split("\n").length} lines
               </span>
@@ -724,7 +712,6 @@ export default function App() {
         ::-webkit-scrollbar-track { background: #141824; }
         ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
         textarea:focus, input:focus { border-color: #6366f1 !important; }
-        select:focus { border-color: #6366f1 !important; }
       `}</style>
     </div>
   );
