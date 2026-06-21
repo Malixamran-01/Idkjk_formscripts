@@ -71,7 +71,7 @@ function randomHobby() {
   return HOBBY_LIST[Math.floor(Math.random() * HOBBY_LIST.length)];
 }
 
-function generateScript(data, email, evcCode, extraHobby) {
+function generateScript(data, email, evcCode, extraHobby, soundEnabled = true) {
   const combinedHobbies = buildHobbies(data.hobbies, extraHobby);
   const hashtag = buildHashtag(data.hobbies, extraHobby);
   const maritalStatus = mapMaritalStatus(data.maritalStatus);
@@ -150,6 +150,28 @@ function getLiveNow() {
   return \`\${dd}-\${mm}-\${yyyy} \${hh}:\${minutes} \${ampm} IST\`;
 }
 
+${soundEnabled ? `// Plays a short beep. Pass true for the final "all done" double-beep.
+function playBeep(done = false) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const tones = done ? [880, 1100] : [660];
+    let time = ctx.currentTime;
+    tones.forEach(freq => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.4, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+      osc.start(time);
+      osc.stop(time + 0.18);
+      time += 0.22;
+    });
+  } catch (e) { /* audio not available */ }
+}` : `function playBeep() {} // sound disabled`}
+
 function getStepHeading() {
   const all = document.querySelectorAll('h2');
   return all[all.length - 1]?.textContent?.trim() || '';
@@ -166,6 +188,7 @@ function waitForStep(stepNumber, timeout = 20000) {
       }
       if (Date.now() - start > timeout) {
         clearInterval(interval);
+        playBeep(false);
         reject(\`⏱️ Timed out waiting for Step \${stepNumber}\`);
       }
     }, 300);
@@ -179,7 +202,8 @@ async function fillStep1() {
   fillReactSelect('#gender', DATA.gender);
   await fillReactInput('#einstagramBenifits', DATA.einstagramBenifits);
   await fillReactInput('#feedbackId', DATA.feedbackId);
-  console.log('\\n👆 Step 1 done! Click Next when ready...');
+  playBeep();
+  console.log('\\n✅ Step 1 done! Click Next when ready...');
 }
 
 async function fillStep2() {
@@ -189,7 +213,8 @@ async function fillStep2() {
   await fillReactInput('#age', DATA.age);
   await fillReactInput('#hobbies', DATA.hobbies);
   await fillReactInput('#primaryJob', DATA.primaryJob);
-  console.log('\\n👆 Step 2 done! Click Next when ready...');
+  playBeep();
+  console.log('\\n✅ Step 2 done! Click Next when ready...');
 }
 
 async function fillStep3() {
@@ -199,7 +224,8 @@ async function fillStep3() {
   await fillReactInput('#instagramMarketingTasks', DATA.instagramMarketingTasks);
   await fillReactInput('#education', DATA.education);
   await fillReactInput('#state', DATA.state);
-  console.log('\\n👆 Step 3 done! Click Next when ready...');
+  playBeep();
+  console.log('\\n✅ Step 3 done! Click Next when ready...');
 }
 
 async function fillStep4() {
@@ -214,6 +240,7 @@ async function fillStep4() {
     checkbox.click();
     console.log('✅ Checked time checkbox');
   }
+  playBeep(true);
   console.log('\\n🔒 Solve hCaptcha manually then click Submit!');
 }
 
@@ -292,6 +319,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [extraHobby, setExtraHobby] = useState(randomHobby());
   const [showModal, setShowModal] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(getNow()), 1000);
@@ -321,7 +349,7 @@ export default function App() {
     }
     const generatedEmail = buildEmail(formNumber.trim(), foundData.name);
     const generatedEvc = buildEvcCode(foundData.city, now);
-    setScript(generateScript(foundData, generatedEmail, generatedEvc, extraHobby));
+    setScript(generateScript(foundData, generatedEmail, generatedEvc, extraHobby, soundEnabled));
     setCopied(false);
     setShowModal(true);
   }
@@ -378,6 +406,35 @@ export default function App() {
             padding: "7px 16px", fontSize: "11px", fontWeight: 600, color: "#a5b4fc", cursor: "pointer",
           }}>
             ↻ Next Form
+          </button>
+          <button
+            onClick={() => setSoundEnabled(s => !s)}
+            title={soundEnabled ? "Sound ON — click to mute" : "Sound OFF — click to enable"}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              opacity: soundEnabled ? 1 : 0.35,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={soundEnabled ? "#a5b4fc" : "#64748b"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {soundEnabled ? (
+                <>
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </>
+              ) : (
+                <>
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </>
+              )}
+            </svg>
           </button>
           <div style={{
             background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: "8px",
