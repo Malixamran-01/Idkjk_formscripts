@@ -177,21 +177,20 @@ function getStepHeading() {
   return all[all.length - 1]?.textContent?.trim() || '';
 }
 
-function waitForStep(stepNumber, timeout = 20000) {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
+// Waits for the heading to change to the target step.
+// No timeout — user can take as long as needed to review before clicking Next.
+function waitForNextThenStep(stepNumber) {
+  return new Promise((resolve) => {
+    console.log(\`👀 Waiting for you to click Next → Step \${stepNumber}...\`);
     const interval = setInterval(() => {
       if (getStepHeading().includes(\`Step \${stepNumber}\`)) {
         clearInterval(interval);
-        console.log(\`📋 Step \${stepNumber} loaded!\`);
-        resolve();
+        setTimeout(() => {
+          console.log(\`📋 Step \${stepNumber} loaded!\`);
+          resolve();
+        }, 400);
       }
-      if (Date.now() - start > timeout) {
-        clearInterval(interval);
-        playBeep(false);
-        reject(\`⏱️ Timed out waiting for Step \${stepNumber}\`);
-      }
-    }, 300);
+    }, 200);
   });
 }
 
@@ -203,7 +202,7 @@ async function fillStep1() {
   await fillReactInput('#einstagramBenifits', DATA.einstagramBenifits);
   await fillReactInput('#feedbackId', DATA.feedbackId);
   playBeep();
-  console.log('\\n✅ Step 1 done! Click Next when ready...');
+  console.log('\\n✅ Step 1 filled — review then click Next.');
 }
 
 async function fillStep2() {
@@ -214,7 +213,7 @@ async function fillStep2() {
   await fillReactInput('#hobbies', DATA.hobbies);
   await fillReactInput('#primaryJob', DATA.primaryJob);
   playBeep();
-  console.log('\\n✅ Step 2 done! Click Next when ready...');
+  console.log('\\n✅ Step 2 filled — review then click Next.');
 }
 
 async function fillStep3() {
@@ -225,7 +224,7 @@ async function fillStep3() {
   await fillReactInput('#education', DATA.education);
   await fillReactInput('#state', DATA.state);
   playBeep();
-  console.log('\\n✅ Step 3 done! Click Next when ready...');
+  console.log('\\n✅ Step 3 filled — review then click Next.');
 }
 
 async function fillStep4() {
@@ -241,23 +240,23 @@ async function fillStep4() {
     console.log('✅ Checked time checkbox');
   }
   playBeep(true);
-  console.log('\\n🔒 Solve hCaptcha manually then click Submit!');
+  console.log('\\n🔒 All done! Solve hCaptcha then click Submit.');
 }
 
 async function run() {
   const heading = getStepHeading();
   console.log('📋 Detected:', heading);
   if (heading.includes('Step 1')) {
-    await fillStep1(); await waitForStep(2);
-    await fillStep2(); await waitForStep(3);
-    await fillStep3(); await waitForStep(4);
+    await fillStep1(); await waitForNextThenStep(2);
+    await fillStep2(); await waitForNextThenStep(3);
+    await fillStep3(); await waitForNextThenStep(4);
     await fillStep4();
   } else if (heading.includes('Step 2')) {
-    await fillStep2(); await waitForStep(3);
-    await fillStep3(); await waitForStep(4);
+    await fillStep2(); await waitForNextThenStep(3);
+    await fillStep3(); await waitForNextThenStep(4);
     await fillStep4();
   } else if (heading.includes('Step 3')) {
-    await fillStep3(); await waitForStep(4);
+    await fillStep3(); await waitForNextThenStep(4);
     await fillStep4();
   } else if (heading.includes('Step 4')) {
     await fillStep4();
